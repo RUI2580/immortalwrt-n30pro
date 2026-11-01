@@ -1,12 +1,34 @@
-const fs = await import("node:fs");
-const im = "D:\\Users\\21540\\Desktop\\DSH WORK\\n30pro-fw\\immortalwrt-src";
+# Auto-generated minimal config for Netcore N30 Pro (MT7981B / netis_nx30v2)
+# Full config will be filled by 'make olddefconfig'
 
-console.log("═══════════════════════════════════════════");
-console.log("══════  文件 1：ci/config-n30pro  ══════");
-console.log("═══════════════════════════════════════════");
-console.log(fs.readFileSync(im + "\\ci\\config-n30pro", "utf-8"));
-console.log("\n");
-console.log("═══════════════════════════════════════════");
-console.log("══════  文件 2：.github/workflows/build.yml  ══════");
-console.log("═══════════════════════════════════════════");
-console.log(fs.readFileSync(im + "\\.github\\workflows\\build.yml", "utf-8"));
+# --- Target ---
+CONFIG_TARGET="mediatek/filogic"
+
+# --- Profile: Netcore N30 Pro = DEVICE_ALT1 of netis_nx30v2 ---
+CONFIG_TARGET_PROFILES_netis_nx30v2=y
+
+# --- Core kmod-mii + USB net stack (USB Tethering) ---
+CONFIG_PACKAGE_kmod-mii=y
+CONFIG_PACKAGE_kmod-usb3=y
+CONFIG_PACKAGE_kmod-usb-net=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y
+CONFIG_PACKAGE_kmod-usb-net-rndis=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-eem=y
+
+# --- Custom packages from package/custom/ ---
+CONFIG_PACKAGE_usb-vbus=y
+CONFIG_PACKAGE_ttlfix=y
+CONFIG_PACKAGE_usbwan-watchdog=y
+
+# --- Dependencies ---
+CONFIG_PACKAGE_nftables=y
+CONFIG_PACKAGE_ping6=y
+CONFIG_PACKAGE_curl=y
+
+# --- Standard build options ---
+CONFIG_ALL_NONSHARED=y
+CONFIG_ALL_KMODS=y
+# CONFIG_ALL is not set
+# CONFIG_STRIP_ALL is not set
+CONFIG_SSTRIP=y
