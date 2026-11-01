@@ -10,7 +10,7 @@ define Package/usbwan-watchdog
   SECTION:=utils
   CATEGORY:=Utilities
   TITLE:=Watchdog for USB WAN interface
-  DEPENDS:=+ping6 +curl +kmod-gpio-button-hotplug
+  DEPENDS:=+curl +kmod-gpio-button-hotplug
 endef
 
 define Package/usbwan-watchdog/description
