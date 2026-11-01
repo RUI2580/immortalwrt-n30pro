@@ -108,6 +108,17 @@ jobs:
           echo '=== start make ==='
           make -j$(nproc) 2>&1 | tee build.log
 
+      - name: Diagnose failing package (on failure)
+        if: failure()
+        run: |
+          echo '=== recompile libffi verbosely ==='
+          make -C package/libs/libffi compile V=s 2>&1 | tail -150 || true
+          echo '=== libffi build_dir tree ==='
+          find build_dir -maxdepth 4 -name 'fficonfig.h' 2>/dev/null || true
+          ls -la build_dir/target-*/libffi-*/ 2>/dev/null | head -40 || true
+          echo '=== tail build.log ==='
+          tail -120 build.log || true
+
       - name: Verify firmware + sha256
         run: |
           echo "=== bin/targets/mediatek/filogic/ ==="
@@ -126,7 +137,6 @@ jobs:
             bin/targets/mediatek/filogic/**/*.img
             bin/targets/mediatek/filogic/**/*.fit
             build.log
-            build-retry.log
             .config
           if-no-files-found: error
           retention-days: 14
