@@ -1,0 +1,50 @@
+#!/bin/sh
+# USB WAN watchdog - ping + reset VBUS + reload USB net on failure
+INTERFACES="usbwan usb0 wwan0"
+LOG="/var/log/usbwan-watchdog.log"
+COOKIE="/tmp/usbwan-watchdog.failures"
+MAX_FAILS=3
+
+vbus_reset() {
+	local chip=512 pin=23
+	echo $pin > /sys/class/gpio/export 2>/dev/null
+	echo out > /sys/class/gpio/gpio${pin}/direction 2>/dev/null
+	echo 0 > /sys/class/gpio/gpio${pin}/value
+	sleep 1
+	echo 1 > /sys/class/gpio/gpio${pin}/value
+}
+
+fail_count=0
+[ -f "$COOKIE" ] && fail_count=$(cat "$COOKIE")
+
+gw_ok=0
+GATEWAY=$(ip route get 223.5.5.5 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="via") print $(i+1)}' | head -1)
+[ -n "$GATEWAY" ] && ping -c 1 -W 2 "$GATEWAY" >/dev/null 2>&1 && gw_ok=1
+
+net_ok=0
+ping -c 1 -W 2 223.5.5.5 >/dev/null 2>&1 && net_ok=1
+
+if [ "$gw_ok" = 1 ] || [ "$net_ok" = 1 ]; then
+	fail_count=0
+	echo 0 > "$COOKIE"
+	exit 0
+fi
+
+fail_count=$((fail_count + 1))
+echo "$fail_count" > "$COOKIE"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] FAIL $fail_count/$MAX_FAILS gw=$GATEWAY" >> "$LOG"
+
+if [ "$fail_count" -ge "$MAX_FAILS" ]; then
+	echo "[$(date '+%Y-%m-%d %H:%M:%S')] === RESETTING USB VBUS ===" >> "$LOG"
+	vbus_reset
+	sleep 3
+	for iface in $INTERFACES; do
+		ubus call network.interface.$iface down 2>/dev/null || true
+		sleep 1
+		ubus call network.interface.$iface up 2>/dev/null || true
+	done
+	for ko in cdc_ncm cdc_eem cdc_ether rndis_host usbnet; do rmmod $ko 2>/dev/null || true; done
+	for ko in usbnet cdc_ether cdc_ncm cdc_eem rndis_host; do modprobe $ko 2>/dev/null || true; done
+	sleep 2
+	echo 0 > "$COOKIE"
+fi

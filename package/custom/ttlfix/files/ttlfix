@@ -1,0 +1,21 @@
+#!/bin/sh /etc/rc.common
+# Fix TTL 64 on USB tethering interfaces via nftables
+START=21
+STOP=85
+
+TABLE="ttlfix"
+
+start_service() {
+	nft add table inet $TABLE
+	nft add chain inet $TABLE postrouting { type route hook postrouting priority srcnat \; }
+	nft add rule inet $TABLE postrouting oifname "usb0" ip ttl set 64
+	nft add rule inet $TABLE postrouting oifname "usb0" ip6 hoplimit set 64
+	nft add rule inet $TABLE postrouting oifname "wwan0" ip ttl set 64
+	nft add rule inet $TABLE postrouting oifname "wwan0" ip6 hoplimit set 64
+	nft add rule inet $TABLE postrouting meta l4proto udp oifname "usb*" ip ttl set 64
+	nft add rule inet $TABLE postrouting meta l4proto udp oifname "usb*" ip6 hoplimit set 64
+}
+
+stop_service() {
+	nft delete table inet $TABLE 2>/dev/null || true
+}

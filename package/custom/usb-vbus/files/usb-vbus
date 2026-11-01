@@ -1,0 +1,24 @@
+#!/bin/sh /etc/rc.common
+# Control USB VBUS GPIO on Netcore N30 Pro
+# GPIO 535 = SoC base 512 + pin 23; active-high to enable 5V
+START=20
+STOP=90
+
+GPIO=535
+CHIP_BASE=512
+VBUS_PIN=$((GPIO - CHIP_BASE))
+
+boot() {
+	echo $VBUS_PIN > /sys/class/gpio/export 2>/dev/null
+	echo out > /sys/class/gpio/gpio${VBUS_PIN}/direction 2>/dev/null
+	echo 1 > /sys/class/gpio/gpio${VBUS_PIN}/value
+}
+
+start_service() {
+	boot
+}
+
+stop_service() {
+	echo 0 > /sys/class/gpio/gpio${VBUS_PIN}/value 2>/dev/null
+	echo $VBUS_PIN > /sys/class/gpio/unexport 2>/dev/null
+}
