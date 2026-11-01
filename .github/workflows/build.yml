@@ -6,6 +6,7 @@ on:
     paths:
       - 'target/linux/mediatek/**'
       - 'package/custom/**'
+      - 'package/libs/**'
       - 'files/**'
       - 'ci/**'
       - '.github/workflows/build.yml'
