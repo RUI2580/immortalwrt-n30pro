@@ -49,13 +49,11 @@ jobs:
 
       - name: Generate .config for N30 Pro
         run: |
-          # Step 1: defconfig (only target + profile, no custom packages)
-          echo "CONFIG_TARGET=\"mediatek/filogic\"" > .config
-          echo "CONFIG_TARGET_PROFILES_netis_nx30v2=y" >> .config
-          make defconfig
-
-          # Step 2: append USB Tethering + custom packages
-          cat >> .config <<'EOF'
+          set -eo pipefail
+          cat > .config <<'EOF'
+          CONFIG_TARGET_mediatek=y
+          CONFIG_TARGET_mediatek_filogic=y
+          CONFIG_TARGET_mediatek_filogic_DEVICE_netis_nx30v2=y
           CONFIG_PACKAGE_kmod-mii=y
           CONFIG_PACKAGE_kmod-usb3=y
           CONFIG_PACKAGE_kmod-usb-net=y
@@ -68,32 +66,47 @@ jobs:
           CONFIG_PACKAGE_usbwan-watchdog=y
           CONFIG_PACKAGE_nftables=y
           CONFIG_PACKAGE_curl=y
-          CONFIG_ALL_NONSHARED=y
-          CONFIG_ALL_KMODS=y
-          # CONFIG_ALL is not set
-          # CONFIG_STRIP_ALL is not set
           CONFIG_SSTRIP=y
+          # CONFIG_ALL is not set
+          # CONFIG_ALL_KMODS is not set
+          # CONFIG_ALL_NONSHARED is not set
           EOF
 
-          # Step 3: olddefconfig resolves dependencies (no interactive fallback)
-          make olddefconfig 2>&1 | tail -30
+          # defconfig 宽容：上游 qt5base/fwknopd/squeezelite 的 Kconfig 递归依赖只会告警，
+          # 仍会写出与 Kconfig 同步的 .config。跑两次让选择收敛。
+          make defconfig
+          make defconfig
 
-          echo "=== final .config (USB/TARGET/CUSTOM) ==="
-          grep -E '^(CONFIG_TARGET=|CONFIG_TARGET_PROFILES_netis|CONFIG_PACKAGE_kmod-usb|CONFIG_PACKAGE_kmod-mii|CONFIG_PACKAGE_usb-vbus|CONFIG_PACKAGE_ttlfix|CONFIG_PACKAGE_usbwan|CONFIG_PACKAGE_nftables|CONFIG_PACKAGE_curl)' .config | sort
+          # olddefconfig 对上游递归依赖是严格模式（会非零退出），但此时 .config 已由 defconfig 写同步，
+          # 失败不应该让 CI 挂掉；记录下来但不传播退出码。
+          if ! make olddefconfig; then
+            echo "::warning::olddefconfig returned non-zero due to upstream recursive Kconfig deps; .config was already synced by defconfig"
+          fi
+
+          echo '=== target/profile ==='
+          grep -E '^CONFIG_TARGET' .config | sort
+          echo '=== usb/custom packages ==='
+          grep -E '^CONFIG_PACKAGE_(kmod-mii|kmod-usb3|kmod-usb-net|kmod-usb-net-cdc-ether|kmod-usb-net-rndis|kmod-usb-net-cdc-ncm|kmod-usb-net-cdc-eem|usb-vbus|ttlfix|usbwan-watchdog|nftables|curl)=' .config | sort
+
+          echo '=== assert required packages enabled ==='
+          missing=0
+          for p in kmod-usb3 kmod-usb-net kmod-usb-net-rndis kmod-usb-net-cdc-ether usb-vbus ttlfix usbwan-watchdog; do
+            if grep -q "^CONFIG_PACKAGE_${p}=y" .config; then
+              echo "  OK   ${p}"
+            else
+              echo "  MISS $p"; missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || { echo 'ERROR: required packages missing from .config'; exit 1; }
+          echo '.config OK'
 
       - name: Build firmware
         run: |
-          echo "=== free disk ==="
+          set -o pipefail
+          echo '=== free disk ==='
           df -h . && nproc
-          echo "=== start make ==="
+          echo '=== start make ==='
           make -j$(nproc) 2>&1 | tee build.log
-          RC=${PIPESTATUS[0]}
-          if [ $RC -ne 0 ]; then
-            echo "=== make FAILED RC=$RC, retrying with -j1 V=s ==="
-            tail -200 build.log
-            make -j1 V=s 2>&1 | tee build-retry.log
-            exit ${PIPESTATUS[0]}
-          fi
 
       - name: Verify firmware + sha256
         run: |
