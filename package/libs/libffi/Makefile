@@ -75,8 +75,8 @@ define Build/InstallDev
 	$(CP) \
 		$(PKG_INSTALL_DIR)/usr/include/*.h \
 		$(1)/usr/include/
-# libffi 3.8.0 用 AC_CONFIG_HEADERS([fficonfig.h]) 在构建根目录生成 fficonfig.h，
-# 不再位于 $(GNU_TARGET_NAME)*/ 子目录（旧 autotools 布局）。两种位置都尝试，缺失不致命。
+# libffi 3.8.0 generates fficonfig.h in the build root via AC_CONFIG_HEADERS,
+# not under $(GNU_TARGET_NAME)*/ anymore (old autotools layout). Try both; missing is non-fatal.
 	$(CP) $(PKG_BUILD_DIR)/fficonfig.h $(1)/usr/include/ 2>/dev/null || \
 	$(CP) $(PKG_BUILD_DIR)/$(GNU_TARGET_NAME)*/fficonfig.h $(1)/usr/include/ 2>/dev/null || true
 endef
