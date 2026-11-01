@@ -1,0 +1,9 @@
+#!/bin/sh
+# Auto-bind USB netdev to usbwan interface + firewall wan zone
+[ "$ACTION" = add ] || exit 0
+[ -z "$INTERFACE" ] && exit 0
+[ -z "$DEVTYPE" ] && exit 0
+case "$DEVTYPE" in cdc_ether|cdc_ncm|rndis_wlan|rndis_host|usb*) ;; *) exit 0 ;; esac
+logger -t usbwan-hotplug "USB netdev: $INTERFACE devtype=$DEVTYPE"
+fw4 add zone "wan" list device "$INTERFACE" 2>/dev/null || true
+ubus call network.interface.usbwan up 2>/dev/null || true
