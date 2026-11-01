@@ -29,22 +29,17 @@ jobs:
     env:
       TARGET: mediatek/filogic
       PROFILE: netis_nx30v2
-      FIRMWARE_NAME: openwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb
 
     steps:
-      - name: Checkout ImmortalWrt source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.REF || github.ref }}
 
-      - name: Install build prerequisites
+      - name: Install prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential clang flex bison g++ gawk \
-            gcc-multilib g++-multilib gettext git ncurses-dev \
-            libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget
+          sudo apt-get install -y             build-essential clang flex bison g++ gawk             gcc-multilib g++-multilib gettext git ncurses-dev             libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget
           sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
 
       - name: Prepare feeds
@@ -52,13 +47,39 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Generate .config from template
+      - name: Generate .config for N30 Pro
         run: |
-          cp ci/config-n30pro .config
-          make olddefconfig
+          # Step 1: defconfig (only target + profile, no custom packages)
+          echo "CONFIG_TARGET=\"mediatek/filogic\"" > .config
+          echo "CONFIG_TARGET_PROFILES_netis_nx30v2=y" >> .config
+          make defconfig
+
+          # Step 2: append USB Tethering + custom packages
+          cat >> .config <<'EOF'
+          CONFIG_PACKAGE_kmod-mii=y
+          CONFIG_PACKAGE_kmod-usb3=y
+          CONFIG_PACKAGE_kmod-usb-net=y
+          CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y
+          CONFIG_PACKAGE_kmod-usb-net-rndis=y
+          CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=y
+          CONFIG_PACKAGE_kmod-usb-net-cdc-eem=y
+          CONFIG_PACKAGE_usb-vbus=y
+          CONFIG_PACKAGE_ttlfix=y
+          CONFIG_PACKAGE_usbwan-watchdog=y
+          CONFIG_PACKAGE_nftables=y
+          CONFIG_PACKAGE_curl=y
+          CONFIG_ALL_NONSHARED=y
+          CONFIG_ALL_KMODS=y
+          # CONFIG_ALL is not set
+          # CONFIG_STRIP_ALL is not set
+          CONFIG_SSTRIP=y
+          EOF
+
+          # Step 3: olddefconfig resolves dependencies (no interactive fallback)
+          make olddefconfig 2>&1 | tail -30
 
           echo "=== final .config (USB/TARGET/CUSTOM) ==="
-          grep -E '^(CONFIG_TARGET=|CONFIG_TARGET_PROFILES_netis|CONFIG_PACKAGE_kmod-usb|CONFIG_PACKAGE_kmod-mii|CONFIG_PACKAGE_usb-vbus|CONFIG_PACKAGE_ttlfix|CONFIG_PACKAGE_usbwan|CONFIG_PACKAGE_nftables|CONFIG_PACKAGE_ping6|CONFIG_PACKAGE_curl)' .config | sort
+          grep -E '^(CONFIG_TARGET=|CONFIG_TARGET_PROFILES_netis|CONFIG_PACKAGE_kmod-usb|CONFIG_PACKAGE_kmod-mii|CONFIG_PACKAGE_usb-vbus|CONFIG_PACKAGE_ttlfix|CONFIG_PACKAGE_usbwan|CONFIG_PACKAGE_nftables|CONFIG_PACKAGE_curl)' .config | sort
 
       - name: Build firmware
         run: |
@@ -74,14 +95,14 @@ jobs:
             exit ${PIPESTATUS[0]}
           fi
 
-      - name: Verify firmware output
+      - name: Verify firmware + sha256
         run: |
           echo "=== bin/targets/mediatek/filogic/ ==="
           ls -la bin/targets/mediatek/filogic/ || true
           echo "=== sha256 ==="
           cd bin/targets/mediatek/filogic/ && sha256sum *.itb *.bin 2>/dev/null || true
 
-      - name: Upload firmware + build log
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
