@@ -1,0 +1,12 @@
+const fs = await import("node:fs");
+const im = "D:\\Users\\21540\\Desktop\\DSH WORK\\n30pro-fw\\immortalwrt-src";
+
+console.log("═══════════════════════════════════════════");
+console.log("══════  文件 1：ci/config-n30pro  ══════");
+console.log("═══════════════════════════════════════════");
+console.log(fs.readFileSync(im + "\\ci\\config-n30pro", "utf-8"));
+console.log("\n");
+console.log("═══════════════════════════════════════════");
+console.log("══════  文件 2：.github/workflows/build.yml  ══════");
+console.log("═══════════════════════════════════════════");
+console.log(fs.readFileSync(im + "\\.github\\workflows\\build.yml", "utf-8"));
