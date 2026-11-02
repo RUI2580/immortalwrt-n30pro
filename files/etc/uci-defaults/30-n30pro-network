@@ -1,0 +1,28 @@
+#!/bin/sh
+# Netcore N30 Pro defaults: 4x LAN bridge + WAN on eth1 + USB tethering fallback
+# Runs once on first boot / after factory reset.
+
+# 4 LAN ports bridged into br-lan (lan1..lan4), WAN on eth1.
+uci -q get network.@device[0] >/dev/null 2>&1 || {
+	uci add network device >/dev/null
+	uci set network.@device[-1].name='br-lan'
+	uci set network.@device[-1].type='bridge'
+	for p in lan1 lan2 lan3 lan4; do uci add_list network.@device[-1].ports="$p"; done
+}
+
+# USB tethering interface (device filled in by /etc/hotplug.d/net/20-usbwan).
+if ! uci -q get network.usbwan >/dev/null 2>&1; then
+	uci add network interface >/dev/null
+	uci set network.@interface[-1].name='usbwan'
+	uci set network.@interface[-1].proto='dhcp'
+	uci set network.@interface[-1].metric='20'
+fi
+
+# Put usbwan in the wan firewall zone so NAT/forwarding applies.
+if ! uci -q get firewall.@zone[1].network | grep -qw usbwan; then
+	uci add_list firewall.@zone[1].network='usbwan'
+	uci commit firewall
+fi
+
+uci commit network
+exit 0
