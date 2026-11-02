@@ -1,28 +1,72 @@
 #!/bin/sh
-# Netcore N30 Pro defaults: 4x LAN bridge + WAN on eth1 + USB tethering fallback
+# Netcore N30 Pro defaults: 4x LAN bridge, WAN on eth1, USB tethering fallback.
 # Runs once on first boot / after factory reset.
 
-# 4 LAN ports bridged into br-lan (lan1..lan4), WAN on eth1.
-uci -q get network.@device[0] >/dev/null 2>&1 || {
-	uci add network device >/dev/null
-	uci set network.@device[-1].name='br-lan'
-	uci set network.@device[-1].type='bridge'
-	for p in lan1 lan2 lan3 lan4; do uci add_list network.@device[-1].ports="$p"; done
-}
-
-# USB tethering interface (device filled in by /etc/hotplug.d/net/20-usbwan).
-if ! uci -q get network.usbwan >/dev/null 2>&1; then
-	uci add network interface >/dev/null
-	uci set network.@interface[-1].name='usbwan'
-	uci set network.@interface[-1].proto='dhcp'
-	uci set network.@interface[-1].metric='20'
+# --- 4 LAN ports bridged into br-lan ---
+if [ "$(uci -q get network.@device[0].name)" != "br-lan" ]; then
+	uci -q delete network.@device[0] 2>/dev/null
+	uci set network.@device[0]='device'
+	uci set network.@device[0].name='br-lan'
+	uci set network.@device[0].type='bridge'
+	for p in lan1 lan2 lan3 lan4; do uci add_list network.@device[0].ports="$p"; done
 fi
 
-# Put usbwan in the wan firewall zone so NAT/forwarding applies.
-if ! uci -q get firewall.@zone[1].network | grep -qw usbwan; then
-	uci add_list firewall.@zone[1].network='usbwan'
+# --- LAN interface ---
+if [ "$(uci -q get network.lan)" != "interface" ]; then
+	uci set network.lan='interface'
+	uci set network.lan.device='br-lan'
+	uci set network.lan.proto='static'
+	uci set network.lan.ipaddr='192.168.1.1'
+	uci set network.lan.netmask='255.255.255.0'
+	uci set network.lan.ip6assign='60'
+fi
+
+# --- WAN on eth1 ---
+if [ "$(uci -q get network.wan)" != "interface" ]; then
+	uci set network.wan='interface'
+	uci set network.wan.device='eth1'
+	uci set network.wan.proto='dhcp'
+fi
+
+# --- USB tethering interface (named section; device filled by hotplug) ---
+if [ "$(uci -q get network.usbwan)" != "interface" ]; then
+	uci set network.usbwan='interface'
+	uci set network.usbwan.proto='dhcp'
+	uci set network.usbwan.metric='20'
+fi
+
+# --- Put usbwan into the wan firewall zone ---
+if ! uci -q get firewall.@zone[1].network 2>/dev/null | grep -qw usbwan; then
+	for i in $(seq 0 15); do
+		[ "$(uci -q get firewall.@zone[$i].name)" = "wan" ] || continue
+		uci add_list firewall.@zone[$i].network='usbwan'
+		break
+	done
 	uci commit firewall
 fi
 
 uci commit network
+
+# --- Auto-mount USB storage under /mnt ---
+mkdir -p /mnt
+if [ -x /sbin/block ] && ! grep -qs '/mnt/sda1' /etc/config/fstab 2>/dev/null; then
+	touch /etc/config/fstab
+	if ! grep -q "config global" /etc/config/fstab 2>/dev/null; then
+		cat >> /etc/config/fstab <<'FSTAB'
+
+config global
+	option anon_mount '1'
+	option anon_swap '0'
+
+config mount
+	option target '/mnt/sda1'
+	option device '/dev/sda1'
+	option fstype 'auto'
+	option options 'rw,sync'
+	option enabled '1'
+	option enabled_fsck '0'
+FSTAB
+	fi
+fi
+
 exit 0
