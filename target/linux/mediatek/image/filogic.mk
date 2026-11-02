@@ -3165,7 +3165,16 @@ define Device/netcore_n30pro
   DEVICE_DTS_DIR := ../dts
   DEVICE_DTC_FLAGS := --pad 4096
   DEVICE_DTS_LOADADDR := 0x43f00000
-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3 kmod-mii kmod-usb-net kmod-usb-net-cdc-ether kmod-usb-net-rndis kmod-usb-net-cdc-ncm kmod-usb-net-cdc-eem
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware \
+	kmod-usb3 kmod-mii kmod-usb-net kmod-usb-net-cdc-ether kmod-usb-net-rndis \
+	kmod-usb-net-cdc-ncm kmod-usb-net-cdc-eem \
+	kmod-usb-storage kmod-usb-storage-uas kmod-scsi-core \
+	kmod-fs-vfat kmod-fs-ext4 kmod-fs-exfat kmod-fs-ntfs3 \
+	kmod-nls-cp437 kmod-nls-iso8859-1 kmod-nls-utf8 \
+	block-mount automount \
+	luci luci-ssl luci-app-firewall luci-app-package-manager \
+	luci-proto-ppp luci-proto-wireguard \
+	luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn
   KERNEL_LOADADDR := 0x44000000
   KERNEL := kernel-bin | gzip
   KERNEL_INITRAMFS := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
