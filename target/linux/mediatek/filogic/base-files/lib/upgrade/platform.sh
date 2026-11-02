@@ -200,6 +200,7 @@ platform_do_upgrade() {
 	mediatek,mt7988a-rfb|\
 	mercusys,mr85x-ubi|\
 	mercusys,mr90x-v1-ubi|\
+	netcore,n30pro|\
 	netis,eap930-v1|\
 	netis,n6-v2|\
 	netis,nx30v2|\
