@@ -25,7 +25,7 @@ define Package/usbwan-watchdog/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) ./files/usbwan-watchdog $(1)/usr/bin/usbwan-watchdog
 	$(INSTALL_DIR) $(1)/etc/crontabs
-	echo "* * * * * root /usr/bin/usbwan-watchdog >> /var/log/usbwan-watchdog.log 2>&1" > $(1)/etc/crontabs/root
+	echo "* * * * * /usr/bin/usbwan-watchdog >> /var/log/usbwan-watchdog.log 2>&1" > $(1)/etc/crontabs/root
 endef
 
 $(eval $(call BuildPackage,usbwan-watchdog))
