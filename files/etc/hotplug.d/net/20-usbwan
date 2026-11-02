@@ -1,9 +1,47 @@
 #!/bin/sh
-# Auto-bind USB netdev to usbwan interface + firewall wan zone
+# Netcore N30 Pro: auto-bind USB tethering netdev to usbwan interface
+#
+# Called by netifd hotplug on interface add/remove. Detects USB ethernet
+# class devices (RNDIS / CDC-ECM / CDC-NCM / CDC-EEM), ensures the usbwan
+# UCI interface exists and points at that device, then brings it up so
+# netifd starts a DHCP client and the wan firewall zone covers it.
+
 [ "$ACTION" = add ] || exit 0
-[ -z "$INTERFACE" ] && exit 0
-[ -z "$DEVTYPE" ] && exit 0
-case "$DEVTYPE" in cdc_ether|cdc_ncm|rndis_wlan|rndis_host|usb*) ;; *) exit 0 ;; esac
-logger -t usbwan-hotplug "USB netdev: $INTERFACE devtype=$DEVTYPE"
-fw4 add zone "wan" list device "$INTERFACE" 2>/dev/null || true
-ubus call network.interface.usbwan up 2>/dev/null || true
+[ -n "$INTERFACE" ] || exit 0
+
+# Only act on USB host drivers; ignore physical ethernet and bridges.
+case "$DEVTYPE" in
+	rndis_host|rndis_wlan|cdc_ether|cdc_ncm|cdc_eem)
+		;;
+	*)
+		exit 0
+		;;
+esac
+
+logger -t usbwan-hotplug "USB netdev $INTERFACE (devtype=$DEVTYPE) attached"
+
+# Make sure the usbwan interface exists and tracks this device.
+if ! uci -q get network.usbwan >/dev/null 2>&1; then
+	uci add network interface >/dev/null
+	uci set network.@interface[-1].name='usbwan'
+	uci set network.@interface[-1].proto='dhcp'
+	uci set network.@interface[-1].metric='20'
+fi
+if [ "$(uci -q get network.usbwan.device)" != "$INTERFACE" ]; then
+	uci set network.usbwan.device="$INTERFACE"
+fi
+
+# Ensure usbwan is inside the wan firewall zone.
+if ! uci -q get firewall.@zone[1].network | grep -qw usbwan; then
+	uci add_list firewall.@zone[1].network='usbwan'
+	uci commit firewall
+	/etc/init.d/firewall reload >/dev/null 2>&1 || true
+fi
+uci commit network
+
+# Wait briefly for the USB link to settle, then let netifd drive DHCP.
+sleep 2
+ubus call network.interface.usbwan down >/dev/null 2>&1 || true
+ubus call network.interface.usbwan up >/dev/null 2>&1 || true
+
+logger -t usbwan-hotplug "usbwan brought up on $INTERFACE"
