@@ -7,6 +7,7 @@ on:
       - 'target/linux/mediatek/**'
       - 'package/custom/**'
       - 'package/libs/**'
+      - 'package/boot/**'
       - 'files/**'
       - 'ci/**'
       - '.github/workflows/build.yml'
@@ -23,13 +24,13 @@ concurrency:
 
 jobs:
   build:
-    name: Build ImmortalWrt (MT7981B / netis_nx30v2)
+    name: Build ImmortalWrt (MT7981B / netcore_n30pro)
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     env:
       TARGET: mediatek/filogic
-      PROFILE: netis_nx30v2
+      PROFILE: netcore_n30pro
 
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +55,7 @@ jobs:
           cat > .config <<'EOF'
           CONFIG_TARGET_mediatek=y
           CONFIG_TARGET_mediatek_filogic=y
-          CONFIG_TARGET_mediatek_filogic_DEVICE_netis_nx30v2=y
+          CONFIG_TARGET_mediatek_filogic_DEVICE_netcore_n30pro=y
           CONFIG_PACKAGE_kmod-mii=y
           CONFIG_PACKAGE_kmod-usb3=y
           CONFIG_PACKAGE_kmod-usb-net=y
@@ -137,6 +138,7 @@ jobs:
             bin/targets/mediatek/filogic/**/*.bin
             bin/targets/mediatek/filogic/**/*.img
             bin/targets/mediatek/filogic/**/*.fit
+            bin/targets/mediatek/filogic/**/*.fip
             build.log
             .config
           if-no-files-found: error
