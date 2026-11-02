@@ -1,5 +1,5 @@
 #!/bin/sh
-# Netcore N30 Pro defaults: 4x LAN bridge, WAN on eth1, USB tethering fallback.
+# Netcore N30 Pro defaults.
 # Runs once on first boot / after factory reset.
 
 # --- 4 LAN ports bridged into br-lan ---
@@ -28,14 +28,22 @@ if [ "$(uci -q get network.wan)" != "interface" ]; then
 	uci set network.wan.proto='dhcp'
 fi
 
-# --- USB tethering interface (named section; device filled by hotplug) ---
+# --- USB tethering interface ---
+# Must be a NAMED section: netifd does not expose anonymous sections
+# (uci add network interface) as network.interface.usbwan, and fw4 then
+# cannot bind the device into the wan zone, so NAT never covers it.
 if [ "$(uci -q get network.usbwan)" != "interface" ]; then
 	uci set network.usbwan='interface'
 	uci set network.usbwan.proto='dhcp'
 	uci set network.usbwan.metric='20'
 fi
 
-# --- Put usbwan into the wan firewall zone ---
+# Pin the tethering device so the interface is usable before hotplug fires.
+if [ -z "$(uci -q get network.usbwan.device)" ]; then
+	uci set network.usbwan.device='usb0'
+fi
+
+# --- Put usbwan into the wan firewall zone (NAT/forwarding) ---
 if ! uci -q get firewall.@zone[1].network 2>/dev/null | grep -qw usbwan; then
 	for i in $(seq 0 15); do
 		[ "$(uci -q get firewall.@zone[$i].name)" = "wan" ] || continue
@@ -47,26 +55,39 @@ fi
 
 uci commit network
 
+# --- RNDIS tethering reports MTU 1500 but the real path MTU is 1400 ---
+# Leaving it at 1500 makes fw4 clamp MSS to 1460, which exceeds the path,
+# so large packets are silently dropped (small pings work, TLS stalls).
+# usb0 is handled by /etc/hotplug.d/net/20-usbwan on attach; this covers
+# the case where the interface already exists at boot.
+for i in usb0; do
+	[ -d "/sys/class/net/$i" ] && ip link set dev "$i" mtu 1400 2>/dev/null
+done
+
+# --- DNS: let the proxy provider's own DNS bypass the local hijack ---
+# OpenWrt dnsmasq installs `udp dport 53 redirect to :53`, which captures
+# every lookup including the proxy core's `proxy-server-nameserver`.
+# The local resolver cannot answer for the provider node domains, so the
+# proxy core fails with `dns resolve failed` and all foreign traffic dies.
+# Forwarding these zones to the provider DNS restores resolution without
+# disabling the hijack for ordinary clients.
+NODE_DNS='43.108.56.44'
+for zone in weifengchat.vip qishanmen.top; do
+	uci -q get dhcp.@dnsmasq[0].server 2>/dev/null | grep -q "/$zone/" && continue
+	uci add_list dhcp.@dnsmasq[0].server="/$zone/$NODE_DNS"
+done
+uci commit dhcp
+
 # --- Auto-mount USB storage under /mnt ---
 mkdir -p /mnt
-if [ -x /sbin/block ] && ! grep -qs '/mnt/sda1' /etc/config/fstab 2>/dev/null; then
+if [ -x /sbin/block ] && ! grep -qs "anon_mount" /etc/config/fstab 2>/dev/null; then
 	touch /etc/config/fstab
-	if ! grep -q "config global" /etc/config/fstab 2>/dev/null; then
-		cat >> /etc/config/fstab <<'FSTAB'
+	cat >> /etc/config/fstab <<'FSTAB'
 
 config global
 	option anon_mount '1'
 	option anon_swap '0'
-
-config mount
-	option target '/mnt/sda1'
-	option device '/dev/sda1'
-	option fstype 'auto'
-	option options 'rw,sync'
-	option enabled '1'
-	option enabled_fsck '0'
 FSTAB
-	fi
 fi
 
 exit 0

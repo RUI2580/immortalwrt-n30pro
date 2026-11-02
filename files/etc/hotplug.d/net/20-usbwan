@@ -1,10 +1,15 @@
 #!/bin/sh
-# Netcore N30 Pro: auto-bind USB tethering netdev to usbwan interface
+# Netcore N30 Pro: bring up USB tethering as the usbwan uplink.
 #
-# netifd only recognises NAMED uci sections (network.usbwan='interface').
-# Creating an anonymous section via 'uci add network interface' does not work:
-# netifd exposes it as network.interface.cfg<random> and fw4 cannot bind the
-# device into the wan zone, so NAT never covers it.
+# Notes that matter (each was verified on hardware):
+# 1) netifd only recognises NAMED uci sections (network.usbwan='interface').
+#    An anonymous section created via 'uci add network interface' is exposed
+#    as network.interface.cfg<random>, so fw4 cannot bind the device into the
+#    wan zone and NAT never covers it.
+# 2) RNDIS/CDC tethering reports MTU 1500 while the real path MTU is 1400.
+#    Unless we lower it, fw4 clamps MSS to 1460, which exceeds the path:
+#    large segments are dropped silently. Symptom is small pings succeeding
+#    while TLS handshakes and downloads stall.
 
 [ "$ACTION" = add ] || exit 0
 [ -n "$INTERFACE" ] || exit 0
@@ -18,6 +23,9 @@ case "$DEVTYPE" in
 esac
 
 logger -t usbwan-hotplug "USB netdev $INTERFACE (devtype=$DEVTYPE) attached"
+
+# Real path MTU of RNDIS tethering; see note 2 above.
+ip link set dev "$INTERFACE" mtu 1400 2>/dev/null || true
 
 # Create/maintain the NAMED interface section.
 if [ "$(uci -q get network.usbwan)" != "interface" ]; then
@@ -54,4 +62,4 @@ if [ -n "$FW_CHANGED" ]; then
 	/etc/init.d/firewall reload >/dev/null 2>&1 || true
 fi
 
-logger -t usbwan-hotplug "usbwan brought up on $INTERFACE"
+logger -t usbwan-hotplug "usbwan up on $INTERFACE (mtu 1400)"
