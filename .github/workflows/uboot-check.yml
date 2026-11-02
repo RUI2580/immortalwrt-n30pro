@@ -7,7 +7,7 @@ jobs:
   uboot:
     name: Compile U-Boot only for netcore_n30pro
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - uses: actions/checkout@v4
@@ -28,27 +28,30 @@ jobs:
 
       - name: Generate .config
         run: |
-          set -eo pipefail
           printf 'CONFIG_TARGET_mediatek=y\nCONFIG_TARGET_mediatek_filogic=y\nCONFIG_TARGET_mediatek_filogic_DEVICE_netcore_n30pro=y\nCONFIG_SSTRIP=y\n' > .config
           make defconfig || true
           make defconfig || true
-          make olddefconfig || true
+          echo '=== .config size ==='
+          wc -l .config
+          echo '=== TOPDIR check ==='
+          grep -q 'CONFIG_TARGET_mediatek' .config && echo 'config has target' || { echo 'ERROR: no target in .config'; exit 1; }
 
-      - name: Show U-Boot patch in tree
+      - name: Prepare toolchain dirs (needed for package builds)
         run: |
-          echo '=== patches dir ==='
-          ls -la package/boot/uboot-mediatek/patches/ | grep -E '505|468' || true
-          echo '=== 505 patch head ==='
-          head -6 package/boot/uboot-mediatek/patches/505-add-netcore-n30pro.patch || true
+          echo '=== building tools ==='
+          make tools/compile -j$(nproc) 2>&1 | tail -20 || true
+          echo '=== after tools ==='
+          ls -d staging_dir/toolchain-* 2>/dev/null || echo 'no toolchain yet'
 
       - name: Compile U-Boot verbose
         run: |
           set -o pipefail
           make -C package/boot/uboot-mediatek compile V=s 2>&1 | tail -200
 
-      - name: Verify generated fip
+      - name: Show results
+        if: always()
         run: |
-          echo '=== stagin_dir images ==='
-          ls -la staging_dir/target-*/image/ 2>/dev/null | grep -iE 'fip|n30pro' || true
-          echo '=== build_dir uboot ==='
-          find build_dir -maxdepth 3 -name '*netcore_n30pro*' 2>/dev/null || true
+          echo '=== staging image dir ==='
+          ls -la staging_dir/target-*/image/ 2>/dev/null | grep -iE 'fip|n30pro' || echo 'none'
+          echo '=== build_dir ==='
+          find build_dir -maxdepth 4 -name '*netcore_n30pro*' 2>/dev/null || echo 'none'
