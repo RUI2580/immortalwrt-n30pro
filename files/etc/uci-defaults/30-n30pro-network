@@ -90,4 +90,35 @@ config global
 FSTAB
 fi
 
+# --- extroot: use the USB stick as the overlay when one is present ---
+# The board's internal overlay is only ~60MB, so package installs fill it
+# quickly. When a USB disk with an ext4 partition is plugged in, keep the
+# writable overlay on it instead. The boot loader and the read-only squashfs
+# still live in SPI-NAND (that is a hardware constraint, not a choice).
+#
+# delay_root is raised because the USB device needs to enumerate before
+# preinit looks for it; the default of 5s was not always enough on this box.
+if [ -b /dev/sda1 ]; then
+	uci set fstab.@global[0].delay_root='10'
+
+	# Seed the overlay from the current (internal) one on first migration.
+	if ! uci -q get fstab.@mount[1] >/dev/null 2>&1 || \
+	   [ "$(uci -q get fstab.@mount[1].target)" != "/overlay" ]; then
+		mkdir -p /mnt/sda1/upper /mnt/sda1/work
+		if [ -d /overlay/upper ] && [ -z "$(ls -A /mnt/sda1/upper 2>/dev/null)" ]; then
+			cp -a /overlay/upper/. /mnt/sda1/upper/ 2>/dev/null || true
+		fi
+
+		uci add fstab mount >/dev/null
+		uci set fstab.@mount[-1].target='/overlay'
+		uci set fstab.@mount[-1].device='/dev/sda1'
+		uci set fstab.@mount[-1].fstype='ext4'
+		uci set fstab.@mount[-1].options='rw,noatime'
+		uci set fstab.@mount[-1].enabled='1'
+		uci set fstab.@mount[-1].enabled_fsck='0'
+		uci commit fstab
+		logger -t n30pro 'extroot configured on /dev/sda1 (reboot to activate)'
+	fi
+fi
+
 exit 0
