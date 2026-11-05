@@ -3174,6 +3174,7 @@ define Device/netcore_n30pro
 	block-mount automount \
 	luci luci-ssl luci-app-firewall luci-app-package-manager \
 	luci-proto-ppp luci-proto-wireguard \
+	kmod-tun \
 	sqm-scripts luci-app-sqm \
 	luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn
   KERNEL_LOADADDR := 0x44000000
