@@ -1,0 +1,11 @@
+#!/bin/sh
+# Use the Argon theme by default when it is present.
+# LuCI keeps the active theme in luci.main.mediaurlbase; the packaged
+# default is still bootstrap, so switch it once on first boot.
+
+if [ -d /www/luci-static/argon ]; then
+	uci set luci.main.mediaurlbase='/luci-static/argon'
+	uci commit luci
+fi
+
+exit 0
