@@ -63,9 +63,6 @@ jobs:
 
       - name: Prepare feeds
         run: |
-          # iStore is not in any upstream feed; it ships from its own repo.
-          grep -q '^src-git istore' feeds.conf.default || \
-            echo 'src-git istore https://github.com/istoreos/istore.git;main' >> feeds.conf.default
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
@@ -91,13 +88,6 @@ jobs:
           CONFIG_PACKAGE_luci-theme-argon=y
           CONFIG_PACKAGE_luci-app-argon-config=y
           CONFIG_PACKAGE_luci-i18n-argon-config-zh-cn=y
-          CONFIG_PACKAGE_luci-app-store=y
-          CONFIG_PACKAGE_libuci-lua=y
-          CONFIG_PACKAGE_mount-utils=y
-          CONFIG_PACKAGE_tar=y
-          CONFIG_PACKAGE_luci-lib-taskd=y
-          CONFIG_PACKAGE_luci-lib-xterm=y
-          CONFIG_PACKAGE_taskd=y
           CONFIG_PACKAGE_usb-vbus=y
           CONFIG_PACKAGE_ttlfix=y
           CONFIG_PACKAGE_usbwan-watchdog=y
@@ -113,14 +103,8 @@ jobs:
 
           # defconfig 宽容：上游 qt5base/fwknopd/squeezelite 的 Kconfig 递归依赖只会告警，
           # 仍会写出与 Kconfig 同步的 .config。跑两次让选择收敛。
-          echo 'DEBUG kconfig store symbol count:'
-          grep -c PACKAGE_luci-app-store tmp/.config-package.in 2>/dev/null || echo 0
-          echo 'DEBUG store dependency lines:'
-          grep -A4 PACKAGE_luci-app-store tmp/.config-package.in 2>/dev/null | head -6 || true
           make defconfig
           make defconfig
-          echo 'DEBUG after defconfig store:'
-          grep luci-app-store .config 2>/dev/null | head -3 || echo NONE
           # olddefconfig 对上游递归依赖是严格模式（会非零退出），但此时 .config 已由 defconfig 写同步，
           # 失败不应该让 CI 挂掉；记录下来但不传播退出码。
           if ! make olddefconfig; then
@@ -134,7 +118,7 @@ jobs:
 
           echo '=== assert required packages enabled ==='
           missing=0
-          for p in kmod-usb3 kmod-usb-net kmod-usb-net-rndis kmod-usb-net-cdc-ether usb-vbus ttlfix usbwan-watchdog kmod-tun kmod-usb-serial sqm-scripts luci-theme-argon luci-app-store taskd; do
+          for p in kmod-usb3 kmod-usb-net kmod-usb-net-rndis kmod-usb-net-cdc-ether usb-vbus ttlfix usbwan-watchdog kmod-tun kmod-usb-serial sqm-scripts luci-theme-argon; do
             if grep -q "^CONFIG_PACKAGE_${p}=y" .config; then
               echo "  OK   ${p}"
             else
