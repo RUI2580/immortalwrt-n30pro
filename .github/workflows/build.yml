@@ -80,6 +80,11 @@ jobs:
           CONFIG_PACKAGE_kmod-usb-net-rndis=y
           CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=y
           CONFIG_PACKAGE_kmod-usb-net-cdc-eem=y
+          CONFIG_PACKAGE_kmod-tun=y
+          CONFIG_PACKAGE_kmod-usb-serial=y
+          CONFIG_PACKAGE_kmod-usb-serial-option=y
+          CONFIG_PACKAGE_sqm-scripts=y
+          CONFIG_PACKAGE_luci-app-sqm=y
           CONFIG_PACKAGE_usb-vbus=y
           CONFIG_PACKAGE_ttlfix=y
           CONFIG_PACKAGE_usbwan-watchdog=y
@@ -111,7 +116,7 @@ jobs:
 
           echo '=== assert required packages enabled ==='
           missing=0
-          for p in kmod-usb3 kmod-usb-net kmod-usb-net-rndis kmod-usb-net-cdc-ether usb-vbus ttlfix usbwan-watchdog; do
+          for p in kmod-usb3 kmod-usb-net kmod-usb-net-rndis kmod-usb-net-cdc-ether usb-vbus ttlfix usbwan-watchdog kmod-tun kmod-usb-serial sqm-scripts; do
             if grep -q "^CONFIG_PACKAGE_${p}=y" .config; then
               echo "  OK   ${p}"
             else
