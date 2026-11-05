@@ -113,9 +113,14 @@ jobs:
 
           # defconfig 宽容：上游 qt5base/fwknopd/squeezelite 的 Kconfig 递归依赖只会告警，
           # 仍会写出与 Kconfig 同步的 .config。跑两次让选择收敛。
+          echo 'DEBUG kconfig store symbol count:'
+          grep -c PACKAGE_luci-app-store tmp/.config-package.in 2>/dev/null || echo 0
+          echo 'DEBUG store dependency lines:'
+          grep -A4 PACKAGE_luci-app-store tmp/.config-package.in 2>/dev/null | head -6 || true
           make defconfig
           make defconfig
-
+          echo 'DEBUG after defconfig store:'
+          grep luci-app-store .config 2>/dev/null | head -3 || echo NONE
           # olddefconfig 对上游递归依赖是严格模式（会非零退出），但此时 .config 已由 defconfig 写同步，
           # 失败不应该让 CI 挂掉；记录下来但不传播退出码。
           if ! make olddefconfig; then
